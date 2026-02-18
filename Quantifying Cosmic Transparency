@@ -1,0 +1,362 @@
+# -*- coding: utf-8 -*-
+#week 1 
+import numpy as np  
+import matplotlib.pyplot as plt  
+
+#constants 
+c = 299792.458 
+H0 = 70        
+omega_m = 0.23     
+omega_lambda = 1-omega_m 
+
+#data 
+data=np.loadtxt('SN data (cleaned).txt')  
+z_data =data[:,0]  
+mu=data[:,1]  
+deltamu=data[:,2]  
+
+#dL 
+dL=10**((mu-25)/5)   
+
+#E 
+def E(z): 
+    return np.sqrt(omega_m*(1+z)**3 +omega_lambda)  
+
+#z range 
+z = np.linspace(0, 1.8, 1000) 
+dz = z[1] - z[0] 
+
+#dL(z) 
+integrand = 1/E(z) 
+integrand_cum = np.cumsum(integrand)*dz 
+dLz = (1+z)*(c/H0)*integrand_cum 
+
+#interpolate dL(z) 
+dLz_int = np.interp(z_data, z, dLz) 
+
+plt.figure()  
+plt.plot(z_data, dL, '.', color='red')  
+plt.xlabel('Redshift')  
+plt.ylabel('Luminosity Distance / Mpc')
+plt.plot(z_data, dLz_int,'.', color='blue', alpha=0.8) 
+
+#omega loop 
+plt.figure() 
+
+plt.errorbar(z_data,mu,fmt='.',yerr=deltamu,capsize=1,ecolor='pink', label='Data Points',color='red',zorder=1,alpha=0.3)  
+omega_m_vals = [0.1, 0.2, 0.3, 0.4, 0.5] 
+
+for omega_m in omega_m_vals: 
+    #E 
+    def E(z): 
+        return np.sqrt(omega_m*(1+z)**3 +omega_lambda)  
+
+    #z range 
+    z = np.linspace(0, 1.8, 1000) 
+    dz = z[1] - z[0] 
+
+    #dL(z) 
+    integrand = 1/E(z) 
+    integrand_cum = np.cumsum(integrand)*dz 
+    dLz = (1+z)*(c/H0)*integrand_cum 
+
+    print(dLz[0]) 
+    print(dLz[1]/z[1]) 
+
+    #dL(z) -> mu 
+    muz = 5*np.log10(dLz)+25 
+
+    #mu plot 
+    plt.xlabel('Redshift') 
+    plt.ylabel('Distance Modulus') 
+    plt.plot(z,muz,'-', label = f'Omega m = {omega_m}',color='blue',alpha=1.2-(2*omega_m),zorder=2)  
+
+plt.legend(loc='lower right') 
+plt.ylim(33, 46.45)
+
+plt.figure()  
+
+#week 2: enumerated omega 
+#sorting data 
+sort = np.argsort(z_data) 
+z_data = z_data[sort] 
+mu = mu[sort] 
+deltamu = deltamu[sort] 
+
+omega_vals =np.linspace(0, 1, 100) 
+muz = np.zeros((len(omega_vals), len(z_data))) 
+
+for i, omega_m in enumerate(omega_vals): 
+    omega_lambda = 1-omega_m 
+
+    #E 
+    def E(z): 
+        return np.sqrt(omega_m*(1+z)**3 +omega_lambda)  
+
+    #z range 
+    z = np.linspace(0, 1.8, 1000) 
+    dz = z[1] - z[0]   
+
+    #dL(z) 
+    integrand = 1/E(z) 
+    integrand_cum = np.cumsum(integrand)*dz 
+    dLz = (1+z)*(c/H0)*integrand_cum 
+
+    #interpolate dL(z) 
+    dLz_int = np.interp(z_data, z, dLz) 
+    muz[i, :] = 5*np.log10(dLz_int)+25 
+
+#plotting 
+plt.errorbar(z_data,mu,fmt='.',yerr=deltamu,color = 'black', capsize=2,ecolor='r', label='mu')  
+for omega_m in [0.1,0.3,0.5,0.7,0.9]: 
+    i = np.argmin(np.abs(omega_vals - omega_m)) 
+    plt.plot(z_data, muz[i,:]) 
+    plt.xlabel('Redshift') 
+    plt.ylabel('Mu') 
+
+#chi squared 
+#vals 
+omega_vals =np.linspace(0, 1, 100) 
+muz = np.zeros((len(omega_vals), len(z_data))) 
+chi2 = np.zeros(len(omega_vals)) 
+z = np.linspace(0, 1.8, 1000) 
+dz = z[1] - z[0]  
+
+for i, omega_m in enumerate(omega_vals): 
+    omega_lambda = 1-omega_m 
+
+    #E 
+    def E(z): 
+        return np.sqrt(omega_m*(1+z)**3 +omega_lambda)   
+
+    #z range 
+    z = np.linspace(0, 1.8, 1000) 
+    dz = z[1] - z[0] 
+
+    #dL(z) 
+    integrand = 1/E(z) 
+    integrand_cum = np.cumsum(integrand)*dz 
+    dLz = (1+z)*(c/H0)*integrand_cum    
+
+    #interpolate dL(z) 
+    dLz_int = np.interp(z_data, z, dLz) 
+    muz[i, :] = 5*np.log10(dLz_int)+25 
+
+    #chi2 
+    chi2[i] = np.sum((mu-muz[i,:])**2/deltamu**2)   
+
+#best omega_m 
+best_ind = np.argmin(chi2)  
+best_om = omega_vals[best_ind] 
+print('Best om',best_om) 
+
+#plot 
+chimin = np.min(chi2) 
+plt.figure() 
+plt.plot(omega_vals, chi2, color='red') 
+plt.ylim(chimin, chimin+12) 
+plt.xlabel('Omega M') 
+plt.ylabel('Chi Squared') 
+#uncertainty lines 
+
+sigma_1 = 1 
+sigma_2 = 2.71
+sigma_3 = 9 
+
+plt.axhline(chimin+sigma_1, linestyle='--', color='blue', label='1σ') 
+plt.axhline(chimin+sigma_2, linestyle='--', color='skyblue', label='2σ') 
+plt.axhline(chimin+sigma_3, linestyle='--', color='lightblue', label='3σ') 
+
+plt.xlim(0.05, 0.7) 
+
+plt.legend() 
+
+#week 3: marginalising over H0 
+#data 
+
+M_thy=np.array([]) 
+omega_vals =np.linspace(0, 1, 100) 
+muthy = np.zeros((len(omega_vals), len(z_data)))
+chi2 = np.zeros(len(omega_vals))  
+
+#dL 
+dL=10**((mu-25)/5) 
+
+for i, omega_m in enumerate(omega_vals): 
+    omega_lambda = 1-omega_m 
+
+    #E 
+    def E(z): 
+        return np.sqrt(omega_m*(1+z)**3 +omega_lambda)  
+
+    #z range 
+    z = np.linspace(0, 1.8, 1000) 
+    dz = z[1] - z[0] 
+    integrand = 1/E(z) 
+    integrand_cum = np.cumsum(integrand)*dz 
+
+    dlz = (1+z)*integrand_cum 
+    muz = 5*np.log10(dlz) 
+    muint = np.interp(z_data, z, muz) 
+
+    #mth 
+    Mth = np.sum((mu-muint)/deltamu**2)/np.sum(1/deltamu**2) 
+    M_thy = np.append(M_thy, Mth) 
+    muthy[i,:]= muint + Mth 
+
+    #chi2 
+    chi2[i] = np.sum(((muint+Mth-mu)/deltamu)**2) 
+
+#best omega_m
+best_ind = np.argmin(chi2)  
+best_om = omega_vals[best_ind] 
+print('H0 marginalised best om',best_om) 
+
+#plot 
+chimin = np.min(chi2) 
+plt.figure() 
+plt.plot(omega_vals, chi2, color='red') 
+plt.ylim(chimin, chimin+12) 
+plt.xlabel('Omega M') 
+plt.ylabel('Chi Squared') 
+
+#uncertainty lines
+plt.axhline(chimin+sigma_1, linestyle='--', color='blue', label='1σ') 
+plt.axhline(chimin+sigma_2, linestyle='--', color='skyblue', label='2σ') 
+plt.axhline(chimin+sigma_3, linestyle='--', color='lightblue', label='3σ')
+ 
+plt.xlim(0.05, 0.7) 
+
+
+
+plt.legend() 
+#week 4 
+
+#data 
+Mthy = np.array([]) 
+omega_vals = np.linspace(0, 1, 100) 
+eps_vals = np.linspace(-1, 1, 1500) 
+zog = 2.5*np.log10(np.e)*2 
+muthy =np.zeros((len(omega_vals), len(eps_vals), len(z_data))) 
+chi2 = np.zeros((len(omega_vals), len(eps_vals))) 
+
+for i, omega_m in enumerate(omega_vals): 
+    omega_lambda = 1 -omega_m 
+
+    def E(z): 
+        return np.sqrt(omega_m*(z+1)**3 +omega_lambda) 
+
+    #z stuff 
+    z = np.linspace(0, 1.8, 1000) 
+    dz = z[1] - z[0] 
+    integrand = 1/E(z) 
+    integrand_cum = np.cumsum(integrand)*dz 
+    dlz = (1+z)*(c/H0)*integrand_cum  
+    muz = 5*np.log10(dlz) + 25 
+    muint = np.interp(z_data, z, muz) 
+
+    for g, eps in enumerate(eps_vals): 
+        muop = muint+zog*eps*z_data 
+        Mth = np.sum((mu-muop)/deltamu**2)/np.sum(1/deltamu**2) 
+        muthy[i, g, :] =muop+Mth 
+        chi2[i, g] = np.sum((mu-muthy[i, g,:])**2/deltamu**2)   
+
+chimin = np.min(chi2) 
+dchi2 = chi2 - chimin
+om, eps = np.meshgrid(omega_vals, eps_vals) 
+
+#plot 
+plt.figure()
+levels = np.linspace(0, np.max(dchi2), 200) 
+plt.contourf(om, eps, dchi2.T, levels=100,cmap='winter',alpha=0.3) 
+plt.contour(omega_vals, eps_vals, dchi2.T, levels =[2.3, 6.18, 11.83], colors = ['red', 'lightcoral', 'pink']) 
+plt.xlim(0, 0.8) 
+plt.ylim(-0.4, 0.4) 
+plt.xlabel('Omega M')
+plt.ylabel('Epsilon')
+
+#week 5 
+H0= 70 
+
+data2=np.loadtxt('Cleaned Hz data2.txt')  
+z_data2 =data2[:,0]  
+H_data =data2[:,1] 
+deltaH = data2[:,2] 
+omega_m2 = np.linspace(0.1, 0.5, 1000) 
+eps2 = np.linspace(-1, 1, 1000) 
+chi2_2 = np.zeros((len(omega_m2), len(eps2))) 
+Hth = np.zeros((len(z_data2), len(omega_m2))) 
+chi2 = np.zeros(len(omega_m2)) 
+
+for i, om2 in enumerate(omega_m2): 
+    E2 = np.sqrt(om2*(1+z_data2)**3 +(1-om2)) 
+    Hth[:, i] = H0*E2 
+    chi2[i] = np.sum(((H_data- Hth[:,i]) / deltaH)**2) 
+    chi2_2[i,:] = chi2[i] 
+
+chimin2 = np.min(chi2_2) 
+levels = chimin2 +  np.array([0, 2.3, 6.18, 11.83]) 
+
+#plot 
+plt.figure() 
+plt.contour(omega_m2, eps2, chi2_2.T, levels=levels) 
+
+#week 6 
+plt.figure() 
+plt.contourf(omega_m2, eps2, chi2_2.T, levels=levels, colors=['pink', 'lightcoral', 'red']) 
+plt.contourf(omega_vals, eps_vals, dchi2.T, levels =[0, 2.3, 4.61, 11.8], colors = ['lightblue', 'skyblue', 'blue']) 
+plt.xlim(0, 0.8) 
+plt.ylim(-0.4, 0.4) 
+plt.xlabel('Omega M')
+plt.ylabel('Epsilon')
+
+
+#week 7
+chi2_Hz_interp = np.interp(omega_vals, omega_m2, chi2)
+chi2_Hz = chi2_Hz_interp[:, None]
+
+chi_total = dchi2 + chi2_Hz
+chi_total = chi_total- np.min(chi_total)
+
+# Plot joint contours
+plt.figure()
+plt.contour(omega_vals,eps_vals,chi_total.T,levels=[2.30, 6.18, 11.83],colors=['blue', 'skyblue', 'lightblue'])
+plt.xlabel('Omega M')
+plt.ylabel('Epsilon')
+plt.title('Joint Chi-Squared Constraints')
+plt.xlim(0, 0.6)
+plt.ylim(-0.2, 0.2)
+
+#week 8 
+like= np.exp(-0.5*chi_total) 
+dom= omega_vals[1] - omega_vals[0] 
+like_eps=np.sum(like, axis=0)*dom 
+like_eps/= np.trapz(like_eps, eps_vals) 
+
+oml= omega_vals[np.argmin(np.min(chi_total))] #axis 
+sigom= 0.05 
+prior = np.exp(-0.5*((omega_vals-oml/sigom)**2)) 
+prior2d= prior[:,None] 
+likeprior = like*prior2d 
+
+like_eps_prior= np.sum(likeprior, axis=0)*dom 
+like_eps_prior= like_eps_prior/np.trapz(like_eps_prior, eps_vals) 
+
+eps_best= eps_vals[np.argmax(like_eps_prior)] 
+print("best fit epsilon=", eps_best) 
+
+#constraint 
+cumfunc= np.cumsum(like_eps_prior) 
+cumfunc /=cumfunc[-1] 
+eps16= eps_vals[np.searchsorted(cumfunc, 0.16)] 
+eps50= eps_vals[np.searchsorted(cumfunc, 0.50)] 
+eps84= eps_vals[np.searchsorted(cumfunc, 0.84)] 
+
+i_om, i_eps = np.unravel_index(np.argmin(chi_total), chi_total.shape)
+omega_best = omega_vals[i_om]
+
+#plt.axvline(omega_best, linestyle='--',color='red',  label='Best Omega M')
+plt.axhline(eps_best, linestyle='--', color='red', label='Best Epsilon')
+plt.legend()
+
+print(f"epsilon= {eps50:.3f} (+{eps84-eps50:.3f}, -{eps50-eps16:.3f})") 
